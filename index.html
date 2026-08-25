@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>denoisejson</title>
+<style>
+:root {
+  --bg: #121A1C;
+  --panel: #172023;
+  --panel-2: #1E282B;
+  --ink: #DBE4E1;
+  --dim: #788884;
+  --faint: #3A484B;
+  --rule: #253134;
+  --add: #34C8B4;
+  --add-bg: rgba(52,200,180,.13);
+  --del: #F2699E;
+  --del-bg: rgba(242,105,158,.12);
+  --mod: #E0A63C;
+  --mod-bg: rgba(224,166,60,.13);
+  --str: #9CC7A6;
+  --num: #8FB8DE;
+  --sel: rgba(52,200,180,.16);
+  --row: 22px;
+}
+html[data-theme="light"] {
+  --bg: #E3E7DF;
+  --panel: #EEF1EA;
+  --panel-2: #D8DED2;
+  --ink: #171C19;
+  --dim: #79837B;
+  --faint: #AAB2A6;
+  --rule: #CDD4C6;
+  --add: #0B6E77;
+  --add-bg: rgba(11,110,119,.11);
+  --del: #9E2B58;
+  --del-bg: rgba(158,43,88,.10);
+  --mod: #8A5A00;
+  --mod-bg: rgba(138,90,0,.11);
+  --str: #3F6B4C;
+  --num: #2F5D8C;
+  --sel: rgba(11,110,119,.14);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+button, input, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+.label {
+  font-size: 10px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 14px;
+  height: 46px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel);
+}
+
+.mark {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  letter-spacing: -.02em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mark em {
+  font-style: normal;
+  color: var(--mod);
+  font-weight: 700;
+  margin-right: 1px;
+}
+.mark b { font-weight: 400; color: var(--dim); }
+.mark small {
+  font-size: 10px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--faint);
+  font-weight: 400;
+}
+
+.tally {
+  display: flex;
+  gap: 2px;
+  align-items: stretch;
+}
+.tally b {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid transparent;
+  border-radius: 2px;
+}
+.tally b i { font-style: normal; opacity: .65; }
+.tally .t-add { color: var(--add); background: var(--add-bg); }
+.tally .t-del { color: var(--del); background: var(--del-bg); }
+.tally .t-mod { color: var(--mod); background: var(--mod-bg); }
+.tally.is-quiet b { color: var(--dim); background: none; }
+
+.spacer { flex: 1 1 auto; }
+
+.btn {
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 4px 9px;
+  font-size: 11px;
+  letter-spacing: .04em;
+  color: var(--dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover { color: var(--ink); border-color: var(--faint); background: var(--panel-2); }
+.btn:focus-visible { outline: 2px solid var(--add); outline-offset: 1px; }
+.btn[aria-pressed="true"] { color: var(--ink); border-color: var(--faint); background: var(--panel-2); }
+.btn-ghost { border-color: transparent; }
+
+.editor {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--rule);
+  border-bottom: 1px solid var(--rule);
+  height: 40vh;
+  min-height: 0;
+}
+body[data-mode="read"] .editor { display: none; }
+
+.pane {
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.pane header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px 6px;
+}
+.pane textarea {
+  flex: 1 1 auto;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: none;
+  padding: 0 12px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  tab-size: 2;
+  color: var(--ink);
+}
+.pane textarea::placeholder { color: var(--faint); }
+.pane.has-error { background: var(--del-bg); }
+
+.err {
+  padding: 5px 12px 9px;
+  font-size: 11px;
+  color: var(--del);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.err:empty { display: none; }
+
+.tools {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 14px;
+  height: 34px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--bg);
+}
+.find {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 380px;
+}
+.find input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: none;
+  padding: 3px 0;
+  font-size: 12px;
+  outline: 0;
+}
+.find input:focus { border-bottom-color: var(--add); }
+.find input::placeholder { color: var(--faint); }
+
+.stage {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+  position: relative;
+}
+
+.tree {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 8px 0 40vh;
+  scrollbar-width: thin;
+}
+
+.r {
+  display: flex;
+  align-items: center;
+  height: var(--row);
+  padding-right: 16px;
+  white-space: nowrap;
+  cursor: default;
+  width: max-content;
+  min-width: 100%;
+}
+.r:hover { background: var(--panel-2); }
+.r.is-target { background: var(--sel); }
+
+.r-add { background: var(--add-bg); }
+.r-del { background: var(--del-bg); }
+.r-mod { background: var(--mod-bg); }
+.r-add:hover, .r-del:hover, .r-mod:hover { filter: brightness(1.35); }
+html[data-theme="light"] .r-add:hover,
+html[data-theme="light"] .r-del:hover,
+html[data-theme="light"] .r-mod:hover { filter: brightness(.97); }
+
+.g {
+  flex: 0 0 26px;
+  text-align: center;
+  color: var(--faint);
+  font-weight: 700;
+  user-select: none;
+}
+.r-add .g { color: var(--add); }
+.r-del .g { color: var(--del); }
+.r-mod .g { color: var(--mod); }
+
+.ind {
+  flex: 0 0 auto;
+  height: 100%;
+  background-image: repeating-linear-gradient(
+    to right, var(--faint) 0 1px, transparent 1px 14px);
+  opacity: .4;
+}
+
+.tw {
+  flex: 0 0 14px;
+  color: var(--faint);
+  cursor: pointer;
+  user-select: none;
+  text-align: center;
+}
+.tw:hover { color: var(--ink); }
+.tw.is-leaf { cursor: default; }
+
+.k { color: var(--ink); cursor: pointer; }
+.k:hover { text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+.r-add .k { color: var(--add); }
+.r-del .k { color: var(--del); }
+.p { color: var(--faint); padding: 0 6px 0 0; }
+.idx { color: var(--dim); }
+
+.v {
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.v-str { color: var(--str); }
+.v-num { color: var(--num); }
+.v-nul { color: var(--faint); font-style: italic; }
+.v-meta { color: var(--faint); }
+
+.was {
+  color: var(--del);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  opacity: .8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.arw { color: var(--faint); padding: 0 8px; flex: 0 0 auto; }
+.now { color: var(--add); overflow: hidden; text-overflow: ellipsis; }
+
+.r-quiet .k, .r-quiet .v, .r-quiet .idx { color: var(--dim); }
+.r-quiet .v-str, .r-quiet .v-num { color: var(--dim); }
+
+.fold {
+  color: var(--dim);
+  cursor: pointer;
+  font-size: 11px;
+  letter-spacing: .05em;
+  border-bottom: 1px dashed var(--faint);
+}
+.fold:hover { color: var(--ink); }
+
+.dot {
+  flex: 0 0 auto;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--mod);
+  margin-left: 8px;
+  opacity: .55;
+}
+
+.map {
+  flex: 0 0 26px;
+  border-left: 1px solid var(--rule);
+  background: var(--panel);
+  position: relative;
+  cursor: pointer;
+}
+.map canvas { display: block; width: 100%; height: 100%; }
+.map .view {
+  position: absolute;
+  left: 0; right: 0;
+  background: var(--ink);
+  opacity: .09;
+  pointer-events: none;
+  min-height: 8px;
+}
+.map.is-off { display: none; }
+
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 24px;
+  color: var(--dim);
+}
+.empty p { margin: 0; max-width: 30em; line-height: 1.6; }
+.empty strong { color: var(--ink); font-weight: 600; display: block; margin-bottom: 4px; }
+.empty .keys { display: flex; flex-wrap: wrap; gap: 6px 14px; justify-content: center; font-size: 11px; }
+kbd {
+  font: inherit;
+  font-size: 10px;
+  border: 1px solid var(--rule);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--ink);
+  background: var(--panel);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translate(-50%, 12px);
+  background: var(--ink);
+  color: var(--bg);
+  padding: 6px 14px;
+  border-radius: 3px;
+  font-size: 11px;
+  letter-spacing: .04em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .16s ease, transform .16s ease;
+  z-index: 10;
+  max-width: 80vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toast.is-up { opacity: 1; transform: translate(-50%, 0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { transition: none; }
+}
+
+@media (max-width: 720px) {
+  .editor { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; height: 46vh; }
+  .mark small { display: none; }
+  .map { flex-basis: 16px; }
+  .bar { gap: 10px; padding: 0 8px; }
+}
+
+.none {
+  padding: 20px 26px;
+  color: var(--dim);
+  max-width: 40em;
+  line-height: 1.6;
+}
+.none b { color: var(--ink); font-weight: 600; }
+</style>
+<script>
+(function () {
+  try {
+    var p = JSON.parse(localStorage.getItem("denoisejson:prefs"));
+    if (p && p.theme) document.documentElement.dataset.theme = p.theme;
+  } catch (e) {}
+})();
+</script>
+</head>
+<body data-mode="edit">
+
+<div class="bar">
+  <div class="mark"><span><em>~</em>denoise<b>json</b></span><small>only what changed</small></div>
+
+  <div class="tally is-quiet" id="tally">
+    <b class="t-add"><i>+</i><span id="nAdd">0</span></b>
+    <b class="t-del"><i>&minus;</i><span id="nDel">0</span></b>
+    <b class="t-mod"><i>~</i><span id="nMod">0</span></b>
+  </div>
+
+  <div class="spacer"></div>
+
+  <button class="btn" id="btnEdit">Hide inputs</button>
+  <button class="btn btn-ghost" id="btnSwap" title="Swap A and B (s)">Swap</button>
+  <button class="btn btn-ghost" id="btnCopy" title="Copy every change as text">Copy changes</button>
+  <button class="btn btn-ghost" id="btnTheme" title="Switch theme">&#9681;</button>
+</div>
+
+<div class="editor">
+  <div class="pane" id="paneA">
+    <header>
+      <span class="label">A &middot; before</span>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost" data-clear="a">Clear</button>
+    </header>
+    <textarea id="inA" spellcheck="false" placeholder="Paste the first JSON here."></textarea>
+    <div class="err" id="errA"></div>
+  </div>
+  <div class="pane" id="paneB">
+    <header>
+      <span class="label">B &middot; after</span>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost" data-clear="b">Clear</button>
+    </header>
+    <textarea id="inB" spellcheck="false" placeholder="Paste the second JSON here."></textarea>
+    <div class="err" id="errB"></div>
+  </div>
+</div>
+
+<div class="tools">
+  <div class="find">
+    <span class="label">Find</span>
+    <input id="find" placeholder="filter by path or value" spellcheck="false">
+  </div>
+  <button class="btn btn-ghost" id="btnUnchanged" aria-pressed="false" title="Show unchanged keys (u)">Unchanged</button>
+  <button class="btn btn-ghost" id="btnExpand">Expand all</button>
+  <button class="btn btn-ghost" id="btnCollapse">Collapse all</button>
+  <span class="spacer"></span>
+  <span class="label" id="pos"></span>
+</div>
+
+<div class="stage">
+  <div class="tree" id="tree" tabindex="0"></div>
+  <div class="map is-off" id="map"><canvas id="mapC"></canvas><div class="view" id="mapV"></div></div>
+  <div class="empty" id="empty">
+    <p><strong>Paste two JSON blobs.</strong>Everything identical gets folded away, so what's left on screen is only what moved.</p>
+    <p class="keys">
+      <span><kbd>n</kbd> / <kbd>p</kbd> next &amp; previous change</span>
+      <span><kbd>/</kbd> find</span>
+      <span><kbd>u</kbd> unchanged</span>
+      <span><kbd>s</kbd> swap</span>
+      <span><kbd>e</kbd> inputs</span>
+    </p>
+    <p><button class="btn" id="btnSample">Load an example</button></p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+"use strict";
+
+const ID_KEYS = ["id", "_id", "uuid", "key", "slug", "sku", "name", "email"];
+const NODE_BUDGET = 200000;
+const ALIGN_LIMIT = 1200000;
+
+const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
+
+function canon(v) {
+  if (v === null || typeof v !== "object") return JSON.stringify(v);
+  if (Array.isArray(v)) return "[" + v.map(canon).join(",") + "]";
+  const ks = Object.keys(v).sort();
+  let s = "{";
+  for (let i = 0; i < ks.length; i++) {
+    if (i) s += ",";
+    s += JSON.stringify(ks[i]) + ":" + canon(v[ks[i]]);
+  }
+  return s + "}";
+}
+
+function preview(v) {
+  if (v === null) return "null";
+  if (Array.isArray(v)) return "[" + v.length + "]";
+  if (typeof v === "object") return "{" + Object.keys(v).length + "}";
+  if (typeof v === "string") return JSON.stringify(v);
+  return String(v);
+}
+
+function valClass(v) {
+  if (v === null) return "v-nul";
+  if (typeof v === "string") return "v-str";
+  if (typeof v === "number" || typeof v === "boolean") return "v-num";
+  return "v-meta";
+}
+
+function clip(s, n) {
+  n = n || 200;
+  return s.length > n ? s.slice(0, n - 1) + "\u2026" : s;
+}
+
+function parse(text) {
+  const t = String(text).trim();
+  if (!t) return { empty: true };
+  try {
+    return { value: JSON.parse(t) };
+  } catch (e) {
+    const m = /position (\d+)/.exec(e.message);
+    let where = "";
+    if (m) {
+      const pos = +m[1];
+      const before = t.slice(0, pos);
+      const line = before.split("\n").length;
+      const col = pos - before.lastIndexOf("\n");
+      const snip = t.slice(Math.max(0, pos - 24), pos + 24).replace(/\n/g, "\u00b7");
+      where = "  line " + line + ", column " + col + "\n  \u2026" + snip + "\u2026";
+    }
+    let hint = "";
+    if (/,\s*[}\]]/.test(t)) hint = "\n  There's a trailing comma before a closing brace.";
+    else if (/'/.test(t) && !/"/.test(t)) hint = "\n  JSON needs double quotes, not single.";
+    return { error: e.message.replace(/^JSON\.parse:\s*/, "") + where + hint };
+  }
+}
+
+function pickIdKey(a, b) {
+  if (a.length + b.length < 2) return null;
+  if (!a.every(isObj) || !b.every(isObj)) return null;
+  for (const k of ID_KEYS) if (usable(a, k) && usable(b, k)) return k;
+  return null;
+
+  function usable(list, k) {
+    const seen = new Set();
+    for (const it of list) {
+      const v = it[k];
+      if (typeof v !== "string" && typeof v !== "number") return false;
+      seen.add(String(v));
+    }
+    return seen.size === list.length;
+  }
+}
+
+function align(ka, kb) {
+  const n = ka.length, m = kb.length;
+  const script = [];
+
+  if (n * m > ALIGN_LIMIT) {
+    const len = Math.max(n, m);
+    for (let i = 0; i < len; i++) {
+      if (i < n && i < m) script.push([i, i]);
+      else if (i < n) script.push([i, -1]);
+      else script.push([-1, i]);
+    }
+    return script;
+  }
+
+  const w = m + 1;
+  const dp = new Int32Array((n + 1) * w);
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i * w + j] = ka[i] === kb[j]
+        ? dp[(i + 1) * w + j + 1] + 1
+        : Math.max(dp[(i + 1) * w + j], dp[i * w + j + 1]);
+    }
+  }
+
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (ka[i] === kb[j]) { script.push([i, j]); i++; j++; }
+    else if (dp[(i + 1) * w + j] >= dp[i * w + j + 1]) { script.push([i, -1]); i++; }
+    else { script.push([-1, j]); j++; }
+  }
+  while (i < n) script.push([i++, -1]);
+  while (j < m) script.push([-1, j++]);
+  return script;
+}
+
+function zip(script) {
+  const out = [];
+  for (let i = 0; i < script.length;) {
+    if (script[i][0] >= 0 && script[i][1] >= 0) { out.push(script[i++]); continue; }
+    const dels = [], adds = [];
+    while (i < script.length && !(script[i][0] >= 0 && script[i][1] >= 0)) {
+      (script[i][1] >= 0 ? adds : dels).push(script[i]);
+      i++;
+    }
+    const pairs = Math.min(dels.length, adds.length);
+    for (let k = 0; k < pairs; k++) out.push([dels[k][0], adds[k][1]]);
+    for (let k = pairs; k < dels.length; k++) out.push(dels[k]);
+    for (let k = pairs; k < adds.length; k++) out.push(adds[k]);
+  }
+  return out;
+}
+
+function makeNode(label, path, status, av, bv, kind) {
+  return {
+    label, path, status, a: av, b: bv,
+    kind: kind || "val", kids: null, branch: false, depth: 0, i: 0, up: null
+  };
+}
+
+function walk(label, path, hasA, av, hasB, bv, ctx) {
+  if (--ctx.budget < 0) return makeNode(label, path, "same", av, bv, "val");
+
+  if (!hasA) {
+    const n = makeNode(label, path, "add", undefined, bv, isObj(bv) || Array.isArray(bv) ? "box" : "val");
+    n.branch = true;
+    return n;
+  }
+  if (!hasB) {
+    const n = makeNode(label, path, "del", av, undefined, isObj(av) || Array.isArray(av) ? "box" : "val");
+    n.branch = true;
+    return n;
+  }
+
+  const same = canon(av) === canon(bv);
+  const bothObj = isObj(av) && isObj(bv);
+  const bothArr = Array.isArray(av) && Array.isArray(bv);
+
+  if (!bothObj && !bothArr) {
+    const n = makeNode(label, path, same ? "same" : "mod", av, bv, "val");
+    n.branch = !same;
+    return n;
+  }
+
+  const n = makeNode(label, path, "same", av, bv, "box");
+  n.kids = [];
+
+  if (bothObj) {
+    const keys = Object.keys(bv).slice();
+    for (const k of Object.keys(av)) if (!(k in bv)) keys.push(k);
+    for (const k of keys) {
+      const p = path + (path ? "." : "") + k;
+      n.kids.push(walk(k, p, k in av, av[k], k in bv, bv[k], ctx));
+    }
+  } else {
+    const idKey = pickIdKey(av, bv);
+    const hash = it => (idKey && isObj(it) && it[idKey] !== undefined) ? "#" + it[idKey] : canon(it);
+    let script = align(av.map(hash), bv.map(hash));
+    if (!idKey) script = zip(script);
+
+    for (const [ai, bi] of script) {
+      if (ai >= 0 && bi >= 0) {
+        const kid = walk("[" + bi + "]", path + "[" + bi + "]", true, av[ai], true, bv[bi], ctx);
+        if (ai !== bi) kid.moved = ai;
+        n.kids.push(kid);
+      } else if (bi >= 0) {
+        n.kids.push(walk("[" + bi + "]", path + "[" + bi + "]", false, undefined, true, bv[bi], ctx));
+      } else {
+        n.kids.push(walk("[" + ai + "]", path + "[" + ai + "]", true, av[ai], false, undefined, ctx));
+      }
+    }
+  }
+
+  n.branch = n.kids.some(k => k.branch);
+  return n;
+}
+
+function flatten(root) {
+  const list = [];
+  (function step(n, d, parent) {
+    n.depth = d;
+    n.i = list.length;
+    n.up = parent;
+    list.push(n);
+    if (n.kids) for (const k of n.kids) step(k, d + 1, n);
+    n.last = list.length - 1;
+  })(root, 0, null);
+  return list;
+}
+
+function tally(root) {
+  const t = { add: 0, del: 0, mod: 0 };
+  (function step(n) {
+    if (n.status === "add") { t.add++; return; }
+    if (n.status === "del") { t.del++; return; }
+    if (n.status === "mod") { t.mod++; return; }
+    if (n.kids) n.kids.forEach(step);
+  })(root);
+  return t;
+}
+
+function diff(a, b) {
+  const ctx = { budget: NODE_BUDGET };
+  const root = walk("root", "", true, a, true, b, ctx);
+  return {
+    root,
+    flat: flatten(root),
+    tally: tally(root),
+    truncated: ctx.budget < 0
+  };
+}
+
+function changes(root) {
+  const out = [];
+  (function step(n) {
+    const p = n.path || "root";
+    if (n.status === "add") { out.push({ op: "add", path: p, to: n.b }); return; }
+    if (n.status === "del") { out.push({ op: "del", path: p, from: n.a }); return; }
+    if (n.status === "mod") { out.push({ op: "mod", path: p, from: n.a, to: n.b }); return; }
+    if (n.kids) n.kids.forEach(step);
+  })(root);
+  return out;
+}
+
+function report(root) {
+  return changes(root).map(c => {
+    if (c.op === "add") return "+ " + c.path + " = " + clip(preview(c.to), 120);
+    if (c.op === "del") return "- " + c.path + " = " + clip(preview(c.from), 120);
+    return "~ " + c.path + ": " + clip(preview(c.from), 90) + " -> " + clip(preview(c.to), 90);
+  }).join("\n");
+}
+
+const ROW = 22;
+const INDENT = 14;
+
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function payload(v) {
+  return esc(clip(typeof v === "string" ? v : JSON.stringify(v), 4000));
+}
+
+function valHTML(v, cls) {
+  return '<span class="v ' + (cls || valClass(v)) + '" data-copy="' + payload(v) + '">' +
+    esc(clip(preview(v))) + "</span>";
+}
+
+function rowHTML(n, isOpen) {
+  if (n.fold) {
+    return '<div class="r r-quiet" data-fold="' + esc(n.tag) + '">' +
+      '<span class="g"></span>' +
+      '<span class="ind" style="width:' + (n.depth * INDENT) + 'px"></span>' +
+      '<span class="tw"></span>' +
+      '<span class="fold">' + n.count + " unchanged</span></div>";
+  }
+
+  const st = n.status;
+  const cls = st === "add" ? "r-add"
+    : st === "del" ? "r-del"
+    : st === "mod" ? "r-mod"
+    : (n.branch ? "" : "r-quiet");
+  const gut = st === "add" ? "+" : st === "del" ? "\u2212" : st === "mod" ? "~" : "";
+  const openable = n.kids && n.kids.length;
+  const tw = openable ? (isOpen(n) ? "\u25be" : "\u25b8") : "";
+
+  let body;
+  if (st === "mod") {
+    body = '<span class="was">' + esc(clip(preview(n.a), 90)) + "</span>" +
+      '<span class="arw">\u2192</span>' +
+      '<span class="now v" data-copy="' + payload(n.b) + '">' + esc(clip(preview(n.b), 90)) + "</span>";
+  } else if (st === "del") {
+    body = valHTML(n.a);
+  } else if (st === "add") {
+    body = valHTML(n.b);
+  } else if (openable) {
+    body = valHTML(n.b !== undefined ? n.b : n.a, "v-meta");
+  } else {
+    body = valHTML(n.b !== undefined ? n.b : n.a);
+  }
+
+  const isIdx = n.label.charAt(0) === "[";
+  const key = n.depth === 0
+    ? '<span class="k">root</span>'
+    : '<span class="k' + (isIdx ? " idx" : "") + '">' + esc(n.label) + "</span>";
+  const moved = n.moved !== undefined
+    ? '<span class="p" title="moved from index ' + n.moved + '">\u21c5</span>' : "";
+  const dot = (n.branch && st === "same") ? '<span class="dot"></span>' : "";
+
+  return '<div class="r ' + cls + '" data-i="' + n.i + '">' +
+    '<span class="g">' + gut + "</span>" +
+    '<span class="ind" style="width:' + (n.depth * INDENT) + 'px"></span>' +
+    '<span class="tw' + (openable ? "" : " is-leaf") + '">' + tw + "</span>" +
+    key + '<span class="p">:</span>' + body + moved + dot +
+    "</div>";
+}
+
+function drawMap(canvas, host, flat) {
+  const w = host.clientWidth, h = host.clientHeight;
+  if (!w || !h || !flat.length) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const css = getComputedStyle(document.documentElement);
+  const colour = {
+    add: css.getPropertyValue("--add").trim(),
+    del: css.getPropertyValue("--del").trim(),
+    mod: css.getPropertyValue("--mod").trim(),
+    faint: css.getPropertyValue("--faint").trim()
+  };
+
+  const scale = h / flat.length;
+  const tick = Math.max(1.5, Math.min(4, scale));
+
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = colour.faint;
+  for (let i = 0; i < flat.length; i++) {
+    if (flat[i].status !== "same") continue;
+    ctx.fillRect(5, i * scale, 4, Math.max(0.5, scale * 0.8));
+  }
+
+  ctx.globalAlpha = 1;
+  for (let i = 0; i < flat.length; i++) {
+    const st = flat[i].status;
+    if (st === "same") continue;
+    ctx.fillStyle = st === "add" ? colour.add : st === "del" ? colour.del : colour.mod;
+    const x = st === "add" ? 3 : st === "del" ? 11 : 7;
+    ctx.fillRect(x, i * scale, Math.min(12, w - x - 2), tick);
+  }
+}
+
+const $ = id => document.getElementById(id);
+const RUN = "\u00a7run";
+const MIN_RUN = 3;
+
+const S = {
+  root: null,
+  flat: [],
+  rows: [],
+  open: new Set(),
+  shut: new Set(),
+  unfolded: new Set(),
+  showSame: false,
+  find: "",
+  cursor: -1
+};
+
+const tree = $("tree"), mapEl = $("map"), mapC = $("mapC"), mapV = $("mapV");
+
+function isOpen(n) {
+  if (S.shut.has(n.path)) return false;
+  if (S.open.has(n.path)) return true;
+  if (S.find) return true;
+  return n.branch;
+}
+
+function matches(n) {
+  if (!S.find) return true;
+  if (n.path.toLowerCase().includes(S.find)) return true;
+  if (n.kids) return false;
+  const a = n.a === undefined ? "" : JSON.stringify(n.a);
+  const b = n.b === undefined ? "" : JSON.stringify(n.b);
+  return (a + " " + b).toLowerCase().includes(S.find);
+}
+
+function hitMask() {
+  const hits = new Uint8Array(S.flat.length);
+  for (const n of S.flat) {
+    if (!matches(n)) continue;
+    for (let j = n.i; j <= n.last; j++) hits[j] = hits[j] || 2;
+    hits[n.i] = 1;
+  }
+  for (let i = S.flat.length - 1; i >= 0; i--) {
+    const n = S.flat[i];
+    if (hits[n.i] && n.up) hits[n.up.i] = hits[n.up.i] || 2;
+  }
+  return hits;
+}
+
+function compose() {
+  const out = [];
+  if (!S.root) { S.rows = out; return; }
+
+  const hits = S.find ? hitMask() : null;
+  let skipUntil = -1;
+
+  for (let i = 0; i < S.flat.length; i++) {
+    const n = S.flat[i];
+    if (i <= skipUntil) continue;
+    if (hits && !hits[n.i]) { skipUntil = n.last; continue; }
+
+    if (!S.showSame && !n.branch && n.depth > 0) {
+      const run = [n];
+      let j = n.last + 1;
+      while (j < S.flat.length) {
+        const m = S.flat[j];
+        if (m.depth !== n.depth || m.branch || (hits && !hits[m.i])) break;
+        run.push(m);
+        j = m.last + 1;
+      }
+      const tag = n.path + RUN;
+      if (run.length >= MIN_RUN && !S.unfolded.has(tag)) {
+        out.push({ fold: true, count: run.length, depth: n.depth, tag, i: n.i });
+        skipUntil = run[run.length - 1].last;
+        continue;
+      }
+    }
+
+    out.push(n);
+    if (n.kids && n.kids.length && !isOpen(n)) skipUntil = n.last;
+  }
+  S.rows = out;
+}
+
+function render(keepScroll) {
+  const top = tree.scrollTop;
+  compose();
+
+  if (S.root && !S.rows.length && S.find) {
+    tree.innerHTML = '<div class="none">No path or value matches <b>' +
+      esc(S.find) + "</b>. Clear the filter to see the whole diff.</div>";
+  } else {
+    tree.innerHTML = S.rows.map(r => rowHTML(r, isOpen)).join("");
+  }
+  $("empty").style.display = S.root ? "none" : "";
+  mapEl.classList.toggle("is-off", !S.root);
+  if (keepScroll) tree.scrollTop = top;
+  if (S.root) drawMap(mapC, mapEl, S.flat);
+  syncView();
+  $("pos").textContent = S.root ? S.rows.length + " rows" : "";
+}
+
+function syncView() {
+  if (!S.root || !S.rows.length) { mapV.style.height = "0"; return; }
+  const first = Math.floor(tree.scrollTop / ROW);
+  const last = Math.floor((tree.scrollTop + tree.clientHeight) / ROW);
+  const a = S.rows[Math.max(0, Math.min(S.rows.length - 1, first))];
+  const b = S.rows[Math.max(0, Math.min(S.rows.length - 1, last))];
+  const h = mapEl.clientHeight, total = S.flat.length;
+  const y1 = ((a && a.i) || 0) / total * h;
+  const y2 = ((b && b.i) || total) / total * h;
+  mapV.style.top = y1 + "px";
+  mapV.style.height = Math.max(8, y2 - y1) + "px";
+}
+
+function scrollToRow(idx) {
+  tree.scrollTop = Math.max(0, idx * ROW - tree.clientHeight / 3);
+  for (const el of tree.querySelectorAll(".is-target")) el.classList.remove("is-target");
+  const el = tree.children[idx];
+  if (el) el.classList.add("is-target");
+  S.cursor = idx;
+  syncView();
+}
+
+function reveal(fullIndex) {
+  const target = S.flat[fullIndex];
+  if (!target) return;
+  for (let p = target.up; p; p = p.up) {
+    S.shut.delete(p.path);
+    S.open.add(p.path);
+  }
+  render(true);
+
+  let idx = S.rows.findIndex(r => !r.fold && r.i === fullIndex);
+  if (idx < 0) {
+    for (const n of S.flat) S.unfolded.add(n.path + RUN);
+    render(true);
+    idx = S.rows.findIndex(r => !r.fold && r.i === fullIndex);
+  }
+  if (idx >= 0) scrollToRow(idx);
+}
+
+function step(dir) {
+  if (!S.rows.length) return;
+  let i = (S.cursor < 0 ? (dir > 0 ? -1 : S.rows.length) : S.cursor) + dir;
+  while (i >= 0 && i < S.rows.length) {
+    const r = S.rows[i];
+    if (!r.fold && r.status !== "same") { scrollToRow(i); return; }
+    i += dir;
+  }
+  toast(dir > 0 ? "No more changes below" : "No more changes above");
+}
+
+function compare() {
+  const ra = parse($("inA").value), rb = parse($("inB").value);
+  $("errA").textContent = ra.error || "";
+  $("errB").textContent = rb.error || "";
+  $("paneA").classList.toggle("has-error", !!ra.error);
+  $("paneB").classList.toggle("has-error", !!rb.error);
+
+  if (ra.error || rb.error || ra.empty || rb.empty) {
+    S.root = null;
+    S.flat = [];
+    S.cursor = -1;
+    setTally(null);
+    render();
+    return;
+  }
+
+  const d = diff(ra.value, rb.value);
+  S.root = d.root;
+  S.flat = d.flat;
+  S.open.clear();
+  S.shut.clear();
+  S.unfolded.clear();
+  S.cursor = -1;
+  setTally(d.tally);
+  render();
+  if (d.truncated) toast("Very large document \u2014 deep branches were left unexpanded");
+}
+
+function setTally(t) {
+  $("nAdd").textContent = t ? t.add : 0;
+  $("nDel").textContent = t ? t.del : 0;
+  $("nMod").textContent = t ? t.mod : 0;
+  $("tally").classList.toggle("is-quiet", !t || (!t.add && !t.del && !t.mod));
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = $("toast");
+  el.textContent = msg;
+  el.classList.add("is-up");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("is-up"), 1600);
+}
+
+function copy(text, note) {
+  const done = () => toast(note || "Copied");
+  const fallback = () => {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); done(); }
+    catch (e) { toast("Couldn't reach the clipboard"); }
+    document.body.removeChild(ta);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, fallback);
+  } else fallback();
+}
+
+let deb;
+function onInput() {
+  clearTimeout(deb);
+  deb = setTimeout(compare, 220);
+}
+
+$("inA").addEventListener("input", onInput);
+$("inB").addEventListener("input", onInput);
+
+tree.addEventListener("click", e => {
+  const foldEl = e.target.closest("[data-fold]");
+  if (foldEl) {
+    S.unfolded.add(foldEl.getAttribute("data-fold"));
+    render(true);
+    return;
+  }
+
+  const row = e.target.closest(".r");
+  if (!row) return;
+  const n = S.flat[+row.getAttribute("data-i")];
+  if (!n) return;
+
+  if (e.target.classList.contains("tw") && n.kids && n.kids.length) {
+    if (isOpen(n)) { S.shut.add(n.path); S.open.delete(n.path); }
+    else { S.open.add(n.path); S.shut.delete(n.path); }
+    render(true);
+    return;
+  }
+  if (e.target.classList.contains("v")) {
+    copy(e.target.getAttribute("data-copy") || "", "Copied value");
+    return;
+  }
+  if (e.target.classList.contains("k")) {
+    copy(n.path || "root", "Copied " + (n.path || "root"));
+    return;
+  }
+
+  S.cursor = S.rows.indexOf(n);
+  for (const el of tree.querySelectorAll(".is-target")) el.classList.remove("is-target");
+  row.classList.add("is-target");
+});
+
+tree.addEventListener("scroll", () => {
+  if (tree._raf) return;
+  tree._raf = requestAnimationFrame(() => { tree._raf = 0; syncView(); });
+});
+
+mapEl.addEventListener("click", e => {
+  if (!S.root) return;
+  const rect = mapEl.getBoundingClientRect();
+  const frac = (e.clientY - rect.top) / rect.height;
+  const want = Math.max(0, Math.min(S.flat.length - 1, Math.round(frac * S.flat.length)));
+
+  let best = want, bestD = Infinity;
+  for (const n of S.flat) {
+    if (n.status === "same") continue;
+    const d = Math.abs(n.i - want);
+    if (d < bestD) { bestD = d; best = n.i; }
+  }
+  reveal(bestD === Infinity ? want : best);
+});
+
+$("find").addEventListener("input", e => {
+  S.find = e.target.value.trim().toLowerCase();
+  S.cursor = -1;
+  render();
+});
+
+function toggleSame() {
+  S.showSame = !S.showSame;
+  $("btnUnchanged").setAttribute("aria-pressed", String(S.showSame));
+  render(true);
+  save();
+}
+
+function toggleEditor() {
+  const read = document.body.dataset.mode === "read";
+  document.body.dataset.mode = read ? "edit" : "read";
+  $("btnEdit").textContent = read ? "Hide inputs" : "Show inputs";
+  requestAnimationFrame(() => { if (S.root) drawMap(mapC, mapEl, S.flat); syncView(); });
+}
+
+$("btnUnchanged").addEventListener("click", toggleSame);
+$("btnEdit").addEventListener("click", toggleEditor);
+
+$("btnExpand").addEventListener("click", () => {
+  S.shut.clear();
+  for (const n of S.flat) {
+    if (n.kids && n.kids.length) S.open.add(n.path);
+    S.unfolded.add(n.path + RUN);
+  }
+  render(true);
+});
+
+$("btnCollapse").addEventListener("click", () => {
+  S.open.clear();
+  S.unfolded.clear();
+  for (const n of S.flat) if (n.kids && n.kids.length && n.depth > 0) S.shut.add(n.path);
+  render(true);
+  tree.scrollTop = 0;
+});
+
+$("btnSwap").addEventListener("click", () => {
+  const a = $("inA").value;
+  $("inA").value = $("inB").value;
+  $("inB").value = a;
+  compare();
+  toast("Swapped A and B");
+});
+
+$("btnCopy").addEventListener("click", () => {
+  if (!S.root) { toast("Nothing to copy yet"); return; }
+  const r = report(S.root);
+  if (!r) { toast("The two are identical"); return; }
+  copy(r, "Copied " + r.split("\n").length + " changes");
+});
+
+$("btnTheme").addEventListener("click", () => {
+  const now = document.documentElement.dataset.theme || "dark";
+  document.documentElement.dataset.theme = now === "dark" ? "light" : "dark";
+  if (S.root) drawMap(mapC, mapEl, S.flat);
+  save();
+});
+
+for (const b of document.querySelectorAll("[data-clear]")) {
+  b.addEventListener("click", () => {
+    $(b.getAttribute("data-clear") === "a" ? "inA" : "inB").value = "";
+    compare();
+  });
+}
+
+document.addEventListener("keydown", e => {
+  const inField = /INPUT|TEXTAREA/.test(document.activeElement.tagName);
+  if (e.key === "Escape" && inField) { document.activeElement.blur(); return; }
+  if (inField || e.metaKey || e.ctrlKey || e.altKey) return;
+
+  if (e.key === "n" || e.key === "j") { e.preventDefault(); step(1); }
+  else if (e.key === "p" || e.key === "k") { e.preventDefault(); step(-1); }
+  else if (e.key === "/") { e.preventDefault(); $("find").focus(); $("find").select(); }
+  else if (e.key === "u") { e.preventDefault(); toggleSame(); }
+  else if (e.key === "s") { e.preventDefault(); $("btnSwap").click(); }
+  else if (e.key === "e") { e.preventDefault(); toggleEditor(); }
+});
+
+window.addEventListener("resize", () => {
+  if (S.root) drawMap(mapC, mapEl, S.flat);
+  syncView();
+});
+
+const PREFS = "denoisejson:prefs";
+
+function store() {
+  try { return window.localStorage; } catch (e) { return null; }
+}
+
+function save() {
+  const s = store();
+  if (!s) return;
+  try {
+    s.setItem(PREFS, JSON.stringify({
+      theme: document.documentElement.dataset.theme,
+      showSame: S.showSame
+    }));
+  } catch (e) { /* ignore */ }
+}
+
+function load() {
+  const s = store();
+  let p = null;
+  try { p = s && JSON.parse(s.getItem(PREFS)); } catch (e) { p = null; }
+  if (p) {
+    if (p.theme) document.documentElement.dataset.theme = p.theme;
+    if (p.showSame) {
+      S.showSame = true;
+      $("btnUnchanged").setAttribute("aria-pressed", "true");
+    }
+  }
+  render();
+}
+
+$("btnSample").addEventListener("click", () => {
+  const A = {
+    requestId: "3f9a-11e",
+    meta: { total: 3, page: 1, perPage: 25, generatedAt: "2026-08-24T09:12:04Z" },
+    users: [
+      { id: 41, name: "Ada", role: "admin", seats: 3, settings: { theme: "dark", digest: "weekly" } },
+      { id: 42, name: "Grace", role: "member", seats: 1, settings: { theme: "light", digest: "weekly" } },
+      { id: 44, name: "Linus", role: "member", seats: 1, settings: { theme: "light", digest: "daily" } }
+    ],
+    flags: { beta: true, newBilling: false, exportCsv: true },
+    region: "us-east-1"
+  };
+  const B = JSON.parse(JSON.stringify(A));
+  B.meta.total = 4;
+  B.meta.generatedAt = "2026-08-25T14:40:51Z";
+  B.users.splice(2, 0, { id: 43, name: "Radia", role: "member", seats: 2, settings: { theme: "dark", digest: "never" } });
+  B.users[1].settings.digest = "daily";
+  B.users[3].role = "admin";
+  delete B.flags.beta;
+  B.flags.auditLog = true;
+
+  $("inA").value = JSON.stringify(A, null, 2);
+  $("inB").value = JSON.stringify(B, null, 2);
+  compare();
+});
+
+load();
+})();
+</script>
+</body>
+</html>
