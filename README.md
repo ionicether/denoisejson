@@ -4,7 +4,7 @@ A JSON diff that hides everything identical, so what's left on screen is only wh
 
 Paste two API responses into most diff tools and you get four hundred identical lines with six interesting ones buried in them. This one collapses identical subtrees to a single row, folds runs of unchanged keys into `12 unchanged`, and puts a map of the whole document down the right edge so you can see where the changes are before you scroll.
 
-**[Try it](https://USERNAME.github.io/denoisejson/)** — or download [`denoisejson.html`](denoisejson.html) and open it. That's the whole install. One file, no dependencies, nothing leaves your machine.
+**[Try it](https://ionicether.github.io/denoisejson/)** — or download [`denoisejson.html`](denoisejson.html) and open it. That's the whole install. One file, no dependencies, nothing leaves your machine.
 
 ## Arrays
 
