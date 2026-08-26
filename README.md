@@ -43,7 +43,3 @@ JSON diffing is well-trodden and most of the good ideas here aren't mine.
 - [json-diff-kit](https://github.com/RexSkz/json-diff-kit) — also recognises a removal beside an insertion as a modification. A proper React library.
 
 What's different here is packaging: a single file you double-click, unchanged content hidden by default rather than behind a toggle, and the document map. If none of that matters to you, use jsondiffpatch.
-
-## License
-
-MIT
