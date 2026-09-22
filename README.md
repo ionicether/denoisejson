@@ -40,7 +40,17 @@ JSON diffing is well-trodden and most of the good ideas here aren't mine.
 - [jd](https://github.com/josephburnett/jd) → LCS array diffing + patch generation, ships a WASM UI.
 - [json-diff-kit](https://github.com/RexSkz/json-diff-kit) → also pairs a removal beside an insertion into a modification. A proper React library.
 
-What's different here is packaging: one file you double-click, unchanged content hidden by default instead of behind a toggle, and the document map. If none of that matters to you → use jsondiffpatch.
+**Use those** if you need the diff as *data*: something to store, send, apply, or reverse. They're patch systems. This isn't one, and never will be.
+
+**Use this** if you just need to look at two payloads right now:
+
+- Nothing to install, nothing to download. Open the link and it's running. No npm, no bundler, no React host app, no Go binary.
+- Everything happens in your browser. No server, no upload, no request leaves the page, so pasting a production payload isn't a decision you have to think about.
+- Save denoisejson.html and it works offline, forever. One file, no dependencies, nothing to fetch. Fine on an airgapped box, behind a corporate firewall, or on a plane.
+- Unchanged content is gone by default, not behind a toggle. Different default, and it's the whole point.
+- Built to be read: `n`/`p` to walk the changes, `/` to filter, and a map of the entire document so you know where the changes are before you scroll.
+
+Roughly: they answer *what is the change, as something I can manipulate?* This answers *what changed, so I can see it?* If you're building sync, audit logs, or undo → not this.
 
 ## Notes
 
